@@ -17,7 +17,7 @@ body{background:#080e1c}header{background:#0d1526;border-color:#243047}.logo{bac
 </style></head>
 <body>
 <header><div class="brand"><span class="logo" aria-hidden="true">ϟ</span><div>FLUJO<small>LABORATORIO DE FÍSICA</small></div></div><nav aria-label="Elegir unidad"><button class="active" data-mode="0"><i>01</i> Cargas</button><button data-mode="1"><i>02</i> Capacitores</button><button data-mode="2"><i>03</i> Corriente</button><button data-mode="3"><i>04</i> Magnetismo</button></nav><span class="header-tag">LABORATORIO INTERACTIVO 3D</span></header>
-<div class="workspace"><main class="experiment"><section class="stage" id="stage" aria-label="Mesa de experimentación"><canvas id="canvas" aria-label="Simulación interactiva; las lecturas se muestran debajo y en el panel derecho" tabindex="0"></canvas><div class="stage-head"><div><p class="eyebrow" id="kicker"></p><h1 id="title"></h1><p id="instruction"></p></div><select id="preset" aria-label="Elegir experimento preparado"></select></div><div class="tools" id="tools" aria-label="Herramientas de lienzo"></div><div class="scene-actions"><button id="demo3d">Iniciar demostración</button><button id="orbit3d" aria-pressed="false">Giro automático</button><button id="home3d">Centrar vista</button></div><span class="scene-tag">PERSPECTIVA 3D · ARRASTRA EL FONDO PARA GIRAR</span><div class="demo-caption" id="demo-caption"></div><div class="tooltip" id="tip"></div><div class="canvas-note" id="scale-note"></div><div class="legend" id="legend"></div><div class="toast" id="toast" role="status"></div></section><section class="readouts" aria-label="Resultados del experimento"><div class="run-controls"><button id="play" title="Pausar o reanudar" aria-label="Pausar simulación">Ⅱ</button><button id="reset" title="Restablecer esta unidad" aria-label="Restablecer esta unidad">↺</button></div><div class="readout"><small id="m1-label"></small><b id="m1"></b></div><div class="readout"><small id="m2-label"></small><b id="m2"></b></div><div class="readout"><small id="m3-label"></small><b id="m3"></b></div></section><div class="bottom-bar"><button id="learn" aria-expanded="false">Entender este experimento</button><span id="status"></span><button id="challenge">Probar un reto</button></div></main><aside class="instrument" aria-label="Instrumentos y controles"><div class="instrument-head"><h2>Instrumentos</h2><span id="unit-label"></span></div><div id="inspector"></div><div class="scope"><div class="scope-label"><span id="graph-label"></span><span id="graph-unit"></span></div><canvas id="graph" width="540" height="190" role="img" aria-label="Gráfica temporal de la magnitud indicada"></canvas></div><p class="keyboard-tip">Espacio: pausa · R: reinicia · Supr: elimina la carga seleccionada</p></aside></div>
+<div class="workspace"><main class="experiment"><section class="stage" id="stage" aria-label="Mesa de experimentación"><canvas id="canvas" aria-label="Simulación interactiva; las lecturas se muestran debajo y en el panel derecho" tabindex="0"></canvas><div class="stage-head"><div><p class="eyebrow" id="kicker"></p><h1 id="title"></h1><p id="instruction"></p></div><select id="preset" aria-label="Elegir experimento preparado"></select></div><div class="tools" id="tools" aria-label="Herramientas de lienzo"></div><div class="scene-actions"><button id="demo3d">Iniciar demostración</button><button id="demo-pause" hidden>Pausar demostración</button><button id="orbit3d" aria-pressed="false">Giro automático</button><button id="home3d">Centrar vista</button></div><span class="scene-tag">PERSPECTIVA 3D · ARRASTRA EL FONDO PARA GIRAR</span><div class="demo-caption" id="demo-caption"></div><div class="tooltip" id="tip"></div><div class="canvas-note" id="scale-note"></div><div class="legend" id="legend"></div><div class="toast" id="toast" role="status"></div></section><section class="readouts" aria-label="Resultados del experimento"><div class="run-controls"><button id="play" title="Pausar o reanudar" aria-label="Pausar simulación">Ⅱ</button><button id="reset" title="Restablecer esta unidad" aria-label="Restablecer esta unidad">↺</button></div><div class="readout"><small id="m1-label"></small><b id="m1"></b></div><div class="readout"><small id="m2-label"></small><b id="m2"></b></div><div class="readout"><small id="m3-label"></small><b id="m3"></b></div></section><div class="bottom-bar"><button id="learn" aria-expanded="false">Entender este experimento</button><span id="status"></span><button id="challenge">Probar un reto</button></div></main><aside class="instrument" aria-label="Instrumentos y controles"><div class="instrument-head"><h2>Instrumentos</h2><span id="unit-label"></span></div><div id="inspector"></div><div class="scope"><div class="scope-label"><span id="graph-label"></span><span id="graph-unit"></span></div><canvas id="graph" width="540" height="190" role="img" aria-label="Gráfica temporal de la magnitud indicada"></canvas></div><p class="keyboard-tip">Espacio: pausa · R: reinicia · Supr: elimina la carga seleccionada</p></aside></div>
 <section id="lesson" class="lesson" aria-label="Explicación del experimento"><div class="lesson-top"><h2 id="lesson-title"></h2><button id="close-lesson">Cerrar</button></div><div class="lesson-body" id="lesson-body"></div></section><div id="live" aria-live="polite"></div>
 <script>
 'use strict';
@@ -29,6 +29,18 @@ const Core={k:8.9875517923e9,e:1.602176634e-19,eps:8.8541878128e-12,mp:1.6726219
  magnetic(q,m,v,B,angle){const vp=v*Math.sin(angle*Math.PI/180),vz=v*Math.cos(angle*Math.PI/180);return{vp,vz,F:Math.abs(q*vp*B),r:B&&vp?Math.abs(m*vp/(q*B)):0,omega:q*B/m,T:B?2*Math.PI*m/Math.abs(q*B):Infinity};}
 };
 globalThis.Core=Core;
+// Reloj único para las etapas: solo consume tiempo cuando la simulación avanza.
+class DemoTimeline {
+ constructor(duration=6.5){this.duration=duration;this.active=false;this.elapsed=0;}
+ start(){this.active=true;this.elapsed=0;}
+ stop(){this.active=false;this.elapsed=0;}
+ tick(dt,paused=false,hidden=false){
+  if(!this.active||paused||hidden||!Number.isFinite(dt)||dt<=0)return false;
+  this.elapsed+=dt;
+  if(this.elapsed>=this.duration){this.elapsed-=this.duration;return true;}
+  return false;
+ }
+}
 if(typeof document!=='undefined'){
 const $=id=>document.getElementById(id),cv=$('canvas'),ctx=cv.getContext('2d'),stage=$('stage'),graph=$('graph'),gx=graph.getContext('2d');
 const ink='#dceafa',muted='#92abc3',red='#ff9873',blue='#83a5ff',green='#79e6c6',purple='#c498f7';
@@ -101,8 +113,17 @@ function drawMag(){const s=mState(),zero=!mag.B||!mag.angle;const radius=Math.mi
  const tracks=magTracks.length?magTracks:[{...s,age:0,trail:[],B:mag.B,angle:mag.angle,v:mag.v*1e5,preview:true}];for(const p of tracks){const isStraight=!p.B||!p.angle;let px,py;if(isStraight){px=W*.25+(p.age%6)/6*W*.55;py=cy;line(ctx,W*.2,cy,W*.8,cy,'#a5b7bf',1.5);arrow(ctx,W*.4,cy+45,W*.6,cy+45,green,2);txt(p.angle===0?'v ∥ B':'B = 0',W*.5,cy+68,green,12);}else{ctx.beginPath();ctx.arc(cx,cy,radius,0,Math.PI*2);ctx.strokeStyle='#9dabb655';ctx.setLineDash([5,6]);ctx.stroke();ctx.setLineDash([]);const a=p.age*1.6*Math.sign(p.omega),start=-Math.PI/2;px=cx+radius*Math.cos(start+a);py=cy+radius*Math.sin(start+a);if(!p.preview){p.trail.push([px,py]);if(p.trail.length>600)p.trail.shift();ctx.beginPath();p.trail.forEach((pt,i)=>i?ctx.lineTo(...pt):ctx.moveTo(...pt));ctx.strokeStyle=p.color+'bb';ctx.lineWidth=2.4;ctx.stroke();}arrow(ctx,px,py,px+(cx-px)*.22,py+(cy-py)*.22,green,1.8);line(ctx,cx,cy,px,py,'#16786d44');txt('r = '+compact(s.r,'m'),cx,cy,green,12);if(p.angle<90)txt('avance paralelo: '+fmt(p.vz,'m/s'),cx,cy+radius+32,muted,12);}disk(px,py,8,p.color,p.q>0?'+':'−');txt(p.label,px+20,py-16,p.color,12,'left');}
 }
 function drawGraph(){gx.clearRect(0,0,540,190);gx.strokeStyle='#e4ebed';gx.lineWidth=1;for(let y=20;y<180;y+=40){gx.beginPath();gx.moveTo(0,y);gx.lineTo(540,y);gx.stroke();}if(history.length<2)return;let lo=Math.min(0,...history),hi=Math.max(...history);if(hi===lo)hi=lo+1;gx.strokeStyle=green;gx.lineWidth=3;gx.beginPath();history.forEach((v,i)=>{const x=i/(Math.max(120,history.length)-1)*540,y=170-(v-lo)/(hi-lo)*140;i?gx.lineTo(x,y):gx.moveTo(x,y);});gx.stroke();}
-function syncPause(){$('play').textContent=paused?'▶':'Ⅱ';$('play').setAttribute('aria-label',paused?'Reanudar simulación':'Pausar simulación');$('play').setAttribute('aria-pressed',String(paused));}
-function loop(t){const dt=Math.min(.04,(t-last)/1000||0);last=t;if(!paused&&!document.hidden){clock+=dt;if(mode===0)stepElectro(dt);if(mode===1){const s=capState(),h=dt*s.tau/1.8;if(cap.connection!=='isolated'){cap.Q=Core.rc(cap.Q,s.C,cap.connection==='charge'?cap.V:0,cap.R*1e6,h);cap.t+=h;}}if(mode===2){const I=current();circuit.Q+=I*dt;circuit.energy+=I*I*circuit.R*dt;}if(mode===3)magTracks.forEach(p=>p.age+=dt);sampleClock+=dt;if(sampleClock>.08){sampleClock=0;let v=mode===0?(cursor?Core.field(cursor.x,cursor.y,charges).E:0):mode===1?capState().V:mode===2?current():mag.v*1e5;history.push(v);if(history.length>180)history.shift();drawGraph();updateReadings();}}
+function syncPause(){
+ last=performance.now();
+ const running=typeof demoClock!=='undefined'&&demoClock.active;
+ const pauseLabel=paused?'Reanudar demostración':'Pausar demostración';
+ $('play').textContent=paused?'▶':'Ⅱ';
+ $('play').setAttribute('aria-label',running?pauseLabel:paused?'Reanudar simulación':'Pausar simulación');
+ $('play').setAttribute('aria-pressed',String(paused));
+ const btn=$('demo-pause');if(btn){btn.hidden=!running;btn.textContent=pauseLabel;btn.setAttribute('aria-pressed',String(paused));}
+ syncDemoTimer();
+}
+function loop(t){const frameDt=Math.max(0,(t-last)/1000||0),dt=Math.min(.04,frameDt);last=t;if(!paused&&!document.hidden){clock+=dt;if(mode===0)stepElectro(dt);if(mode===1){const s=capState(),h=dt*s.tau/1.8;if(cap.connection!=='isolated'){cap.Q=Core.rc(cap.Q,s.C,cap.connection==='charge'?cap.V:0,cap.R*1e6,h);cap.t+=h;}}if(mode===2){const I=current();circuit.Q+=I*dt;circuit.energy+=I*I*circuit.R*dt;}if(mode===3)magTracks.forEach(p=>p.age+=dt);sampleClock+=dt;if(sampleClock>.08){sampleClock=0;let v=mode===0?(cursor?Core.field(cursor.x,cursor.y,charges).E:0):mode===1?capState().V:mode===2?current():mag.v*1e5;history.push(v);if(history.length>180)history.shift();drawGraph();updateReadings();}}
  scale=Math.min(W/4.3,H/3.1)*zoom;grid();if(mode===0)drawElectro();if(mode===1)drawCap();if(mode===2)drawCurrent();if(mode===3)drawMag();requestAnimationFrame(loop);}
 const lessons=[
  ['Cargas, protones y campo eléctrico',`<div><h3>Qué estás viendo</h3><p>Cargas del mismo signo se repelen y de signo contrario se atraen. Los vectores señalan la dirección de la fuerza sobre una carga <b>positiva</b> de prueba. Las líneas salen de + y llegan a −. El mapa representa el potencial escalar, no la intensidad del campo.</p><div class="formula">E = Σ kq r̂/r² · V = Σ kq/r</div></div><div><h3>¿Y los protones?</h3><p>El protón tiene +e y el electrón −e. En los metales, los protones pertenecen a núcleos ligados a la red; se mueven los electrones de conducción. Un protón libre sí puede formar un haz. Al frotar objetos suelen transferirse electrones, no protones.</p></div><div><h3>Prueba esto</h3><p>Prepara dos cargas iguales. Mide en el punto medio: el campo puede ser cero mientras el potencial no lo es. Con dos cargas opuestas iguales, el potencial del punto medio es cero y el campo no. Las partículas de prueba no modifican las fuentes.</p></div>`],
@@ -116,7 +137,7 @@ const challenges=['Reto: coloca dos cargas + iguales. Busca dónde el campo es c
 document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>initMode(+b.dataset.mode));$('preset').onchange=e=>preset(e.target.value);$('play').onclick=()=>{paused=!paused;syncPause();};$('reset').onclick=()=>initMode(mode);$('learn').onclick=()=>{const on=$('lesson').classList.toggle('open');$('learn').setAttribute('aria-expanded',String(on));};$('close-lesson').onclick=()=>{$('lesson').classList.remove('open');$('learn').setAttribute('aria-expanded','false');$('learn').focus();};$('challenge').onclick=()=>toast(challenges[mode]);window.addEventListener('resize',resize);window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName))return;if(e.code==='Space'){e.preventDefault();paused=!paused;syncPause();}if(e.key==='r'||e.key==='R')initMode(mode);if(e.key==='Delete'&&mode===0)removeCharge();if(e.key==='Escape'){$('lesson').classList.remove('open');$('learn').setAttribute('aria-expanded','false');}});
 // Geometría tridimensional propia: proyección en perspectiva y cámara orbital.
 // Sin librerías, descargas ni servicios; todo se incluye en este HTML.
-let cam={yaw:.48,pitch:-.29,z:1},orbiting=false,viewDrag=null,autoOrbit=false,demoTimer=null,demoIndex=0;
+let cam={yaw:.48,pitch:-.29,z:1},orbiting=false,viewDrag=null,autoOrbit=false,demoClock=new DemoTimeline(),demoIndex=0,demoTimeout=null,demoStartedAt=0;
 const scenery=[];
 function project3(x,y,z){const a=cam.yaw,b=cam.pitch,c=Math.cos(a),d=Math.sin(a),e=Math.cos(b),f=Math.sin(b);const xx=x*c+z*d,zz=-x*d+z*c,yy=y*e-zz*f,depth=y*f+zz*e;const perspective=5/(5+depth),u=Math.min(W/4.5,H/3)*cam.z;return{x:W*.51+xx*u*perspective,y:H*.56-yy*u*perspective,k:u*perspective,depth};}
 function unprojectPlane(px,py){const p0=project3(0,0,0),px1=project3(.001,0,0),py1=project3(0,.001,0);const a=(px1.x-p0.x)/.001,b=(py1.x-p0.x)/.001,c=(px1.y-p0.y)/.001,d=(py1.y-p0.y)/.001,det=a*d-b*c;let x=((px-p0.x)*d-(py-p0.y)*b)/det,y=((py-p0.y)*a-(px-p0.x)*c)/det;for(let j=0;j<6;j++){const p=project3(x,y,0),qx=project3(x+.001,y,0),qy=project3(x,y+.001,0),aa=(qx.x-p.x)/.001,bb=(qy.x-p.x)/.001,cc=(qx.y-p.y)/.001,dd=(qy.y-p.y)/.001,D=aa*dd-bb*cc;if(Math.abs(D)<.001)break;x+=((px-p.x)*dd-(py-p.y)*bb)/D;y+=((py-p.y)*aa-(px-p.x)*cc)/D;}return{x,y};}
@@ -128,7 +149,7 @@ function sphere3(v,r,color,sign='',halo=true){const p=project3(...v),R=Math.max(
 function quad3(points,fill,stroke){const ps=points.map(v=>project3(...v));ctx.beginPath();ps.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();}}
 function box3(x,y,z,wx,hy,dz,color){const p=[[x-wx/2,y-hy/2,z-dz/2],[x+wx/2,y-hy/2,z-dz/2],[x+wx/2,y+hy/2,z-dz/2],[x-wx/2,y+hy/2,z-dz/2],[x-wx/2,y-hy/2,z+dz/2],[x+wx/2,y-hy/2,z+dz/2],[x+wx/2,y+hy/2,z+dz/2],[x-wx/2,y+hy/2,z+dz/2]];const faces=[[0,1,2,3],[4,5,6,7],[0,4,7,3],[1,5,6,2],[3,2,6,7],[0,1,5,4]];faces.sort((a,b)=>b.reduce((s,i)=>s+project3(...p[i]).depth,0)-a.reduce((s,i)=>s+project3(...p[i]).depth,0));faces.forEach(f=>quad3(f.map(i=>p[i]),color+'40',color+'a0'));}
 function floor3(){for(let i=-12;i<=12;i++){const a=i*.25;seg3([a,-1.05,-2],[a,-1.05,2],'#38557525');seg3([-3,-1.05,a],[3,-1.05,a],'#38557525');}arrow3([-1.6,-1.04,1.05],[-1.15,-1.04,1.05],'#ff9873aa');arrow3([-1.6,-1.04,1.05],[-1.6,-.59,1.05],'#79e6c6aa');arrow3([-1.6,-1.04,1.05],[-1.6,-1.04,.6],'#83a5ffaa');label3('x',[-1.05,-1.04,1.05],red,10);label3('y',[-1.6,-.5,1.05],green,10);label3('z',[-1.6,-1.04,.5],blue,10);}
-grid=function(){const g=ctx.createRadialGradient(W*.53,H*.5,20,W*.5,H*.55,W*.75);g.addColorStop(0,'#152945');g.addColorStop(.5,'#0c182e');g.addColorStop(1,'#080e1b');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);if(autoOrbit&&!viewDrag)cam.yaw+=.0017;floor3();};
+grid=function(){const g=ctx.createRadialGradient(W*.53,H*.5,20,W*.5,H*.55,W*.75);g.addColorStop(0,'#152945');g.addColorStop(.5,'#0c182e');g.addColorStop(1,'#080e1b');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);if(autoOrbit&&!paused&&!document.hidden&&!viewDrag)cam.yaw+=.0017;floor3();};
 function field3(x,y,z){let ex=0,ey=0,ez=0;for(const c of charges){const dx=x-c.x,dy=y-c.y,dz=z,rr=Math.max(.06,Math.hypot(dx,dy,dz)),f=Core.k*c.q/rr**3;ex+=f*dx;ey+=f*dy;ez+=f*dz;}return{ex,ey,ez,E:Math.hypot(ex,ey,ez)};}
 drawElectro=function(){
  if(electro.heat){for(let x=-1.8;x<1.8;x+=.12)for(let y=-.9;y<.95;y+=.12){const f=Core.field(x+.06,y+.06,charges),t=Math.tanh(f.V/50),alpha=Math.round(Math.abs(t)*65).toString(16).padStart(2,'0');quad3([[x,y,0],[x+.12,y,0],[x+.12,y+.12,0],[x,y+.12,0]],(t>0?'#ff9873':'#83a5ff')+alpha);}}
@@ -166,9 +187,34 @@ const tours=[
  [['01 · Circuito cerrado','La batería mantiene una diferencia de potencial y circula corriente.',()=>{circuit.V=6;circuit.R=30;circuit.closed=true;inspector();}],['02 · Doble resistencia','Con el mismo voltaje, duplicar R reduce la corriente a la mitad.',()=>{circuit.R=60;inspector();}],['03 · Circuito abierto','Sin una trayectoria conductora cerrada, la corriente estacionaria es cero.',()=>{circuit.closed=false;inspector();$('switch').textContent='Cerrar circuito';}],['04 · Dos sentidos diferentes','Los electrones azules se desplazan en sentido contrario a la corriente convencional verde.',()=>{circuit.closed=true;circuit.conventional=true;inspector();}]],
  [['01 · Protón perpendicular al campo','La fuerza magnética desvía la trayectoria, pero no cambia la rapidez.',()=>{mag={particle:'proton',v:3,B:.5,angle:90};magTracks=[];inspector();launchMag();}],['02 · Electrón: signo opuesto','Con B fijo, el signo de la carga invierte el sentido del giro. La escala se adapta a su masa.',()=>{mag.particle='electron';magTracks=[];inspector();launchMag();}],['03 · Una hélice real en el espacio','La componente perpendicular gira; la paralela avanza. Gira la vista para ver la profundidad.',()=>{mag.angle=60;magTracks=[];inspector();launchMag();}],['04 · Velocidad paralela','Para θ = 0°, v × B es cero. La partícula sigue una trayectoria recta.',()=>{mag.angle=0;magTracks=[];inspector();launchMag();}]]
 ];
-function stopDemo(){if(demoTimer)clearInterval(demoTimer);demoTimer=null;if($('demo3d')){$('demo3d').textContent='Iniciar demostración';$('demo3d').classList.remove('running');$('demo-caption').classList.remove('show');}}
-function demoStep(){const step=tours[mode][demoIndex];step[2]();paused=false;syncPause();updateReadings();$('demo-caption').innerHTML='<b>'+step[0]+'</b><p>'+step[1]+'</p>';$('demo-caption').classList.add('show');demoIndex=(demoIndex+1)%tours[mode].length;}
-$('demo3d').onclick=()=>{if(demoTimer){stopDemo();return;}demoIndex=0;demoStep();autoOrbit=true;$('orbit3d').classList.add('running');$('orbit3d').setAttribute('aria-pressed','true');$('demo3d').textContent='Detener demostración';$('demo3d').classList.add('running');demoTimer=setInterval(demoStep,6500);};
+function syncDemoTimer(){
+ if(demoTimeout!==null){
+  if(demoClock.active)demoClock.elapsed=Math.min(demoClock.duration,demoClock.elapsed+(performance.now()-demoStartedAt)/1000);
+  clearTimeout(demoTimeout);demoTimeout=null;
+ }
+ if(!demoClock.active||paused||document.hidden)return;
+ demoStartedAt=performance.now();
+ demoTimeout=setTimeout(()=>{
+  demoTimeout=null;
+  if(!demoClock.active||paused||document.hidden)return;
+  demoClock.elapsed=0;demoStep();
+ },Math.max(0,(demoClock.duration-demoClock.elapsed)*1000));
+}
+function stopDemo(){
+ demoClock.stop();autoOrbit=false;
+ $('orbit3d').classList.remove('running');$('orbit3d').setAttribute('aria-pressed','false');
+ if($('demo3d')){$('demo3d').textContent='Iniciar demostración';$('demo3d').classList.remove('running');$('demo-caption').classList.remove('show');}
+ syncPause();
+}
+function demoStep(){const step=tours[mode][demoIndex];step[2]();syncPause();updateReadings();$('demo-caption').innerHTML='<b>'+step[0]+'</b><p>'+step[1]+'</p>';$('demo-caption').classList.add('show');demoIndex=(demoIndex+1)%tours[mode].length;}
+$('demo3d').onclick=()=>{
+ if(demoClock.active){stopDemo();return;}
+ demoIndex=0;demoClock.start();paused=false;demoStep();autoOrbit=true;
+ $('orbit3d').classList.add('running');$('orbit3d').setAttribute('aria-pressed','true');
+ $('demo3d').textContent='Detener demostración';$('demo3d').classList.add('running');syncPause();
+};
+ $('demo-pause').onclick=()=>{paused=!paused;syncPause();};
+document.addEventListener('visibilitychange',()=>{last=performance.now();syncDemoTimer();});
 window.addEventListener('keydown',e=>{if(e.key==='Escape')stopDemo();});
 
 initMode(0);requestAnimationFrame(loop);
